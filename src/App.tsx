@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { HotspotPoint, DailyHarmonizedRecord, CalendarWeekCell } from './types/fire';
+import React, { useState, useMemo } from 'react';
+import { HotspotPoint } from './types/fire';
 import { HarmonizationEngine } from './services/harmonization';
 import { SyntheticDataService, REGION_PRESETS } from './services/syntheticData';
 import { FirmsApiService } from './services/firmsApi';
 import { FirePredictionModel, EnvironmentalData, Prediction2027Output } from './services/predictionModel';
+import { toDMS } from './utils/geo';
 import { Header } from './components/Header';
 import { MapView } from './components/MapView';
 import { AreaAnalysisPanel } from './components/AreaAnalysisPanel';
@@ -35,7 +36,6 @@ export const App: React.FC = () => {
   const handleSelectCoordinates = async (coords: { lat: number; lon: number }) => {
     setSelectedCoords(coords);
 
-    // 1. Fetch environmental data from proxy or client calculation
     try {
       const envResp = await fetch(`/api/environmental?lat=${coords.lat}&lon=${coords.lon}`);
       const weatherResp = await fetch(`/api/weather?lat=${coords.lat}&lon=${coords.lon}`);
@@ -70,7 +70,6 @@ export const App: React.FC = () => {
         }
       });
     } catch (e) {
-      // Fallback environmental values
       setEnvironmentalData({
         terrain: { elevationMeters: 450, slopeCategory: 'Moderate (8-14°)' },
         vegetation: {
@@ -89,7 +88,7 @@ export const App: React.FC = () => {
     const virtualPreset = {
       ...defaultRegion,
       id: `coord-${selectedCoords?.lat || 0}`,
-      name: `Location (${selectedCoords?.lat || 0}°, ${selectedCoords?.lon || 0}°)`,
+      name: selectedCoords ? toDMS(selectedCoords.lat, selectedCoords.lon) : 'Global',
       calibrationFactor: 3.82
     };
     const raw = SyntheticDataService.generateHistoricalSeries(virtualPreset);
@@ -194,13 +193,13 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-space-950 text-slate-100 flex flex-col font-sans">
       {/* Top Application Header */}
       <Header
-        activeRegionName={selectedCoords ? `${selectedCoords.lat}°N, ${selectedCoords.lon}°E` : 'Global Map Exploration'}
+        activeRegionName={selectedCoords ? toDMS(selectedCoords.lat, selectedCoords.lon) : 'Global Map Exploration'}
         onExportData={handleExportCSV}
         onOpenInfo={() => setShowInfoModal(true)}
       />
 
       {/* Main Responsive Grid Layout */}
-      <main className="flex-1 p-3 md:p-5 max-w-[1800px] w-full mx-auto flex flex-col lg:flex-row gap-5">
+      <main className="flex-1 p-3 md:p-5 max-w-[1900px] w-full mx-auto flex flex-col lg:flex-row gap-5">
         {/* Left Column: Interactive Map (Dominant Center Stage) */}
         <div className={`flex-1 transition-all duration-300 flex flex-col ${selectedCoords ? 'lg:w-3/5' : 'w-full'}`}>
           <MapView

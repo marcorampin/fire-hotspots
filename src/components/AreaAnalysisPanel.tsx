@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { CalendarWeekCell, DailyHarmonizedRecord } from '../types/fire';
 import { EnvironmentalData, Prediction2027Output } from '../services/predictionModel';
+import { toDMS } from '../utils/geo';
 import { BurningCalendar } from './BurningCalendar';
 import { SeasonalityChart } from './SeasonalityChart';
-import { AnomalyMetrics } from './AnomalyMetrics';
 import {
   MapPin,
   X,
@@ -12,9 +12,7 @@ import {
   Trees,
   Droplets,
   Sparkles,
-  Download,
-  AlertTriangle,
-  Info
+  Download
 } from 'lucide-react';
 
 interface AreaAnalysisPanelProps {
@@ -52,10 +50,11 @@ export const AreaAnalysisPanel: React.FC<AreaAnalysisPanelProps> = ({
 
   const { terrain, vegetation, climate, weather } = environmentalData;
   const summary = prediction2027?.summary;
+  const dmsString = toDMS(selectedCoords.lat, selectedCoords.lon);
 
   return (
     <div className="bg-space-900 border-t lg:border-t-0 lg:border-l border-space-700/80 p-5 overflow-y-auto max-h-[85vh] lg:max-h-full flex flex-col gap-5 shadow-2xl animate-fadeIn">
-      {/* 1. Header with Coordinates and Close Button */}
+      {/* 1. Header with exact DMS Coordinates and Close Button */}
       <div className="flex items-start justify-between border-b border-space-800 pb-4">
         <div className="flex items-center space-x-3">
           <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
@@ -66,13 +65,10 @@ export const AreaAnalysisPanel: React.FC<AreaAnalysisPanelProps> = ({
               <h2 className="text-base font-bold text-white tracking-wide">
                 Selected Area Analysis
               </h2>
-              <span className="text-[11px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
-                {selectedCoords.lat.toFixed(2)}°N, {selectedCoords.lon.toFixed(2)}°E
-              </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Harmonized multi-decadal fire history and 2027 predictive forecast.
-            </p>
+            <div className="text-xs font-mono font-bold text-amber-300 mt-0.5">
+              {dmsString}
+            </div>
           </div>
         </div>
 

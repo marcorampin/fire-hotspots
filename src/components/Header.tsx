@@ -26,22 +26,21 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs text-space-400 hidden sm:inline">• NASA Space Apps Challenge</span>
           </div>
           <p className="text-xs text-slate-400">
-            MODIS & VIIRS Multi-Decadal Harmonization (2000–2026) • <span className="text-slate-300 font-medium">{activeRegionName}</span>
+            MODIS & VIIRS Harmonization (2000–2026) & 2027 Forecast • <span className="text-amber-300 font-mono font-medium">{activeRegionName}</span>
           </p>
         </div>
       </div>
 
       <div className="flex items-center space-x-3">
-        <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-space-800/80 border border-space-700 text-xs text-slate-300">
-          <Satellite className="w-3.5 h-3.5 text-sky-400" />
-          <span>Terra • Aqua • Suomi-NPP • NOAA-20</span>
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 ml-1" />
+        <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>NASA FIRMS API: <strong>d3482...3048</strong></span>
         </div>
 
         <button
           onClick={onOpenInfo}
-          className="p-2 rounded-lg bg-space-800 hover:bg-space-700 text-slate-300 hover:text-white border border-space-700 transition"
-          title="About the Harmonization Algorithm"
+          className="p-2 rounded-lg bg-space-800 hover:bg-space-700 text-slate-300 hover:text-white border border-space-700 transition text-xs font-medium"
+          title="About the Harmonization Algorithm & Environmental Datasets"
         >
           <Info className="w-4 h-4" />
         </button>
@@ -51,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs shadow-md transition"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Export Harmonized Data</span>
+          <span>Export 2000–2027 CSV</span>
         </button>
       </div>
     </header>
