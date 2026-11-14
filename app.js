@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const GEOJSON_PATH = "output/thinned_fires.geojson";
+const GEOJSON_PATH = "output/merged_2018.geojson";
 
 // ============================================================
 // MAP INITIALIZATION
