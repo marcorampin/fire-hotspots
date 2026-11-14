@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Global Fire Detections — MODIS & VIIRS</title>
+    <title>Global Fire Detections РІР‚вЂќ MODIS & VIIRS</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -17,7 +17,13 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map"></div><section id="landscape-panel" aria-label="Landscape layers">
+<strong>Landscape layers</strong>
+
+<div id="landscape" aria-live="polite">Loading land cover and elevation at map centreвЂ¦</div>
+<button id="land-centre" type="button">Inspect map centre</button>
+<small>Click any location to update.</small>
+</section>
 
     <!-- Legend / info panel -->
     <div id="info-panel">
@@ -31,7 +37,12 @@
                 <span class="dot nominal"></span> Nominal confidence
             </div>
         </div>
-        <div id="stats">Loading data…</div>
+        <fieldset style="margin:12px 0"><legend>Explore a time</legend>
+<label for="when">Local time</label> <output id="clock" for="when">All saved times</output>
+<input style="width:100%" id="when" type="range" min="0" max="0" step="1" disabled>
+<div id="zone"></div><label for="window">Fire observations</label> <output id="span" for="window">Previous 24 hours</output>
+<input style="width:100%" id="window" type="range" min="0" max="2" step="1" value="1" disabled>
+<small>Choose Previous hour to view weather and precipitation.</small><div><button id="reset">Reset</button></div><small id="range"></small></fieldset><div id="stats">Loading dataРІР‚В¦</div>
     </div>
 
     <!-- Leaflet JS -->
@@ -42,6 +53,41 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
     <!-- Our logic -->
-    <script src="app.js"></script>
-</body>
+    <script src="app.js"></script><script src="weather.js"></script>
+<nav id="panel-dock" aria-label="Map panels"></nav>
+<script>
+(()=>{
+  const dock=document.getElementById('panel-dock'),panels=[];
+  const icons={Fire:'M12 2c2 5 6 6 6 12a6 6 0 0 1-12 0c0-3 2-6 4-8 0 3 1 4 2 4 2-2 1-5 0-8Z',Landscape:'M2 19l7-12 4 6 3-5 6 11Z',Weather:'M5 16a4 4 0 0 1 0-8 6 6 0 0 1 11-1 4.5 4.5 0 1 1 2 9H5Z'};
+  for(const [id,title] of [['info-panel','Fire'],['weather-panel','Weather'],['landscape-panel','Landscape']]){
+    const panel=document.getElementById(id);if(!panel)continue;
+    document.body.append(panel);
+    panel.classList.add('float-panel');
+    const toggle=document.createElement('button');toggle.type='button';toggle.title=title+' panel';toggle.setAttribute('aria-label',toggle.title);toggle.setAttribute('aria-controls',id);
+    toggle.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+icons[title]+'"/></svg>';dock.append(toggle);
+    const bar=document.createElement('div');bar.className='panel-bar';
+    const grip=document.createElement('button');grip.type='button';grip.textContent=title+'  ⠿';grip.title='Drag to move, or focus and use arrow keys';grip.setAttribute('aria-label','Move '+title+' panel with arrow keys');
+    const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close '+title+' panel');bar.append(grip,close);panel.prepend(bar);
+    let saved={};try{saved=JSON.parse(localStorage.getItem('layout-'+id)||'{}')||{}}catch{}
+    function save(){try{localStorage.setItem('layout-'+id,JSON.stringify(saved))}catch{}}
+    function move(x,y){if(!panel.getClientRects().length)return;const rect=panel.getBoundingClientRect();
+      saved.x=Math.round(Math.max(0,Math.min(x,innerWidth-rect.width)));saved.y=Math.round(Math.max(0,Math.min(y,innerHeight-rect.height)));
+      Object.assign(panel.style,{left:saved.x+'px',top:saved.y+'px',bottom:'auto',right:'auto'});}
+    function restore(){if(Number.isFinite(saved.x)&&Number.isFinite(saved.y))move(saved.x,saved.y)}
+    function show(open){panel.hidden=!open;saved.open=open;toggle.setAttribute('aria-expanded',String(open));if(open)restore();}
+    show(saved.open??(title==='Fire'));
+    toggle.onclick=()=>{show(panel.hidden);save();if(!panel.hidden)grip.focus();};
+    close.onclick=()=>{show(false);save();toggle.focus();};
+    let drag;
+    grip.onpointerdown=e=>{if(e.button!==0)return;const b=panel.getBoundingClientRect();drag=[e.clientX-b.left,e.clientY-b.top];grip.setPointerCapture(e.pointerId);};
+    grip.onpointermove=e=>{if(drag)move(e.clientX-drag[0],e.clientY-drag[1]);};
+    grip.onlostpointercapture=()=>{drag=null;save();};
+    grip.onkeydown=e=>{const delta={ArrowLeft:[-12,0],ArrowRight:[12,0],ArrowUp:[0,-12],ArrowDown:[0,12]}[e.key];if(!delta)return;e.preventDefault();const b=panel.getBoundingClientRect();move(b.left+delta[0],b.top+delta[1]);save();};
+    panel.onkeydown=e=>{if(e.key==='Escape')close.click();};
+    panels.push(panel);panel.addEventListener('pointerdown',()=>{for(const p of panels)p.style.zIndex='1010';panel.style.zIndex='1011';});
+    window.addEventListener('resize',restore);
+    if(title==='Weather'){const sync=()=>{toggle.hidden=panel.style.display==='none';if(!toggle.hidden)restore();};sync();window.addEventListener('instantchange',sync);}
+  }
+})();
+</script></body>
 </html>
