@@ -1,0 +1,76 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#map {
+    height: 100vh;
+    width: 100%;
+}
+
+#info-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 14px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    max-width: 260px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#info-panel h2 {
+    margin: 0 0 4px 0;
+    font-size: 15px;
+    color: #222;
+}
+
+#info-panel .subtitle {
+    margin: 0 0 10px 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid #333;
+}
+
+.dot.high    { background: #d73027; }
+.dot.nominal { background: #fc8d59; }
+
+#stats {
+    font-size: 12px;
+    color: #333;
+}
+
+/* Popup styling */
+.leaflet-popup-content {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.leaflet-popup-content b {
+    color: #d73027;
+}
