@@ -37,7 +37,6 @@
       50% { transform: scale(1.3); opacity: 0.4; }
     }
     .pulse-glow { animation: pulseSlow 2.5s infinite ease-in-out; }
-    /* Custom scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0c111e; }
     ::-webkit-scrollbar-thumb { background: #233052; border-radius: 4px; }
@@ -49,6 +48,8 @@
 
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
+
+    const NASA_MAP_KEY = "d3482fbea45aa613a24989c27e983048";
 
     // --- REGIONAL PRESETS ---
     const REGIONS = [
@@ -104,7 +105,7 @@
       }
     ];
 
-    // --- SYNTHETIC DATA GENERATOR ---
+    // --- SYNTHETIC DATA GENERATOR FOR 24-YEAR MATRIX ---
     function generateTimeSeries(region) {
       const records = [];
       const startDate = new Date('2000-01-01T00:00:00Z');
@@ -124,18 +125,13 @@
         const doy = Math.floor((current.getTime() - startOfYear.getTime()) / 86400000);
 
         let seasonal = 0.05;
-        if (region.id === 'amazon') {
-          seasonal = Math.exp(-Math.pow(Math.abs(doy - 250) / 45, 2));
-        } else if (region.id === 'california') {
-          seasonal = Math.exp(-Math.pow(Math.abs(doy - 260) / 50, 2));
-        } else if (region.id === 'australia') {
+        if (region.id === 'amazon') seasonal = Math.exp(-Math.pow(Math.abs(doy - 250) / 45, 2));
+        else if (region.id === 'california') seasonal = Math.exp(-Math.pow(Math.abs(doy - 260) / 50, 2));
+        else if (region.id === 'australia') {
           const dist = doy > 200 ? Math.abs(doy - 360) : Math.abs(doy - 10);
           seasonal = Math.exp(-Math.pow(dist / 40, 2));
-        } else if (region.id === 'canada') {
-          seasonal = Math.exp(-Math.pow(Math.abs(doy - 180) / 35, 2));
-        } else {
-          seasonal = Math.exp(-Math.pow(Math.abs(doy - 255) / 40, 2));
-        }
+        } else if (region.id === 'canada') seasonal = Math.exp(-Math.pow(Math.abs(doy - 180) / 35, 2));
+        else seasonal = Math.exp(-Math.pow(Math.abs(doy - 255) / 40, 2));
 
         let anomaly = 1.0;
         if (region.id === 'australia' && (year === 2019 || year === 2020) && (month === 11 || month === 0)) anomaly = 4.8;
@@ -224,23 +220,32 @@
       });
     }
 
-    // --- SAMPLE MAP HOTSPOTS ---
-    function generateHotspots(region, count = 150) {
-      const [minLon, minLat, maxLon, maxLat] = region.bbox;
+    // --- PARSE NASA FIRMS CSV RESPONSE ---
+    function parseFirmsCSV(csvText, instrument) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length <= 1) return [];
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const latIdx = headers.indexOf('latitude');
+      const lonIdx = headers.indexOf('longitude');
+      const frpIdx = headers.indexOf('frp');
+      const satIdx = headers.indexOf('satellite');
+
       const pts = [];
-      for (let i = 0; i < count; i++) {
-        const clusterLon = minLon + (maxLon - minLon) * (0.3 + 0.4 * (i % 3) / 2);
-        const clusterLat = minLat + (maxLat - minLat) * (0.3 + 0.4 * ((i + 1) % 3) / 2);
-        const lon = clusterLon + (Math.random() - 0.5) * 1.6;
-        const lat = clusterLat + (Math.random() - 0.5) * 1.6;
-        const isViirs = Math.random() > 0.35;
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',');
+        if (parts.length < headers.length) continue;
+        const lat = parseFloat(parts[latIdx]);
+        const lon = parseFloat(parts[lonIdx]);
+        if (isNaN(lat) || isNaN(lon)) continue;
+
         pts.push({
-          id: `hs-${i}`,
+          id: `firms-${instrument.toLowerCase()}-${i}`,
           lat: Math.round(lat * 1000) / 1000,
           lon: Math.round(lon * 1000) / 1000,
-          instrument: isViirs ? 'VIIRS' : 'MODIS',
-          satellite: isViirs ? 'Suomi-NPP' : 'Aqua',
-          frp: isViirs ? Math.round((Math.random() * 80 + 3) * 10) / 10 : Math.round((Math.random() * 160 + 15) * 10) / 10
+          instrument,
+          satellite: parts[satIdx] || (instrument === 'VIIRS' ? 'Suomi-NPP' : 'Aqua'),
+          frp: parseFloat(parts[frpIdx]) || 12.0
         });
       }
       return pts;
@@ -258,16 +263,94 @@
       const [showGibs, setShowGibs] = useState(false);
       const [activeHotspot, setActiveHotspot] = useState(null);
 
-      // Change region
+      // LIVE NASA FIRMS API STATE
+      const [liveFirmsActive, setLiveFirmsActive] = useState(false);
+      const [liveHotspots, setLiveHotspots] = useState([]);
+      const [isLoadingFirms, setIsLoadingFirms] = useState(false);
+      const [firmsStatusMsg, setFirmsStatusMsg] = useState('');
+
       const handleRegionChange = (reg) => {
         setSelectedRegion(reg);
         setFactor(reg.calibrationFactor);
+        if (liveFirmsActive) {
+          fetchLiveFirmsData(reg);
+        }
+      };
+
+      // Fetch live NASA FIRMS detections
+      const fetchLiveFirmsData = async (reg = selectedRegion) => {
+        setIsLoadingFirms(true);
+        setFirmsStatusMsg('Connecting to NASA FIRMS satellite feed...');
+        const [w, s, e, n] = reg.bbox;
+        const bboxStr = `${w},${s},${e},${n}`;
+
+        try {
+          // Fetch VIIRS 375m and MODIS
+          const viirsUrl = `/api/firms?source=VIIRS_SNPP_NRT&bbox=${bboxStr}&dayRange=1&mapKey=${NASA_MAP_KEY}`;
+          const modisUrl = `/api/firms?source=MODIS_NRT&bbox=${bboxStr}&dayRange=1&mapKey=${NASA_MAP_KEY}`;
+
+          let viirsText = '';
+          let modisText = '';
+
+          try {
+            const vResp = await fetch(viirsUrl);
+            if (vResp.ok) viirsText = await vResp.text();
+          } catch(e) {
+            // direct fallback
+            const directV = await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${NASA_MAP_KEY}/VIIRS_SNPP_NRT/${bboxStr}/1`);
+            if (directV.ok) viirsText = await directV.text();
+          }
+
+          try {
+            const mResp = await fetch(modisUrl);
+            if (mResp.ok) modisText = await mResp.text();
+          } catch(e) {
+            const directM = await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${NASA_MAP_KEY}/MODIS_NRT/${bboxStr}/1`);
+            if (directM.ok) modisText = await directM.text();
+          }
+
+          const viirsPts = parseFirmsCSV(viirsText, 'VIIRS');
+          const modisPts = parseFirmsCSV(modisText, 'MODIS');
+          const combined = [...viirsPts, ...modisPts];
+
+          setLiveHotspots(combined);
+          setLiveFirmsActive(true);
+          setFirmsStatusMsg(`Live NASA Feed Active: ${combined.length} hot spots detected in last 24h`);
+        } catch (err) {
+          console.error('FIRMS error:', err);
+          setFirmsStatusMsg('NASA FIRMS API connection failed; showing calibrated sample baseline.');
+        } finally {
+          setIsLoadingFirms(false);
+        }
       };
 
       // Generate time series & harmonize
       const rawRecords = useMemo(() => generateTimeSeries(selectedRegion), [selectedRegion]);
       const harmonizedRecords = useMemo(() => harmonizeData(rawRecords, factor), [rawRecords, factor]);
-      const hotspots = useMemo(() => generateHotspots(selectedRegion, 160), [selectedRegion]);
+
+      // Synthetic baseline hotspots if not using live
+      const baselineHotspots = useMemo(() => {
+        const [minLon, minLat, maxLon, maxLat] = selectedRegion.bbox;
+        const pts = [];
+        for (let i = 0; i < 160; i++) {
+          const cLon = minLon + (maxLon - minLon) * (0.3 + 0.4 * (i % 3) / 2);
+          const cLat = minLat + (maxLat - minLat) * (0.3 + 0.4 * ((i + 1) % 3) / 2);
+          const lon = cLon + (Math.random() - 0.5) * 1.6;
+          const lat = cLat + (Math.random() - 0.5) * 1.6;
+          const isViirs = Math.random() > 0.35;
+          pts.push({
+            id: `hs-base-${i}`,
+            lat: Math.round(lat * 1000) / 1000,
+            lon: Math.round(lon * 1000) / 1000,
+            instrument: isViirs ? 'VIIRS' : 'MODIS',
+            satellite: isViirs ? 'Suomi-NPP' : 'Aqua',
+            frp: isViirs ? Math.round((Math.random() * 80 + 3) * 10) / 10 : Math.round((Math.random() * 160 + 15) * 10) / 10
+          });
+        }
+        return pts;
+      }, [selectedRegion]);
+
+      const activeMapHotspots = liveFirmsActive && liveHotspots.length > 0 ? liveHotspots : baselineHotspots;
 
       // Year-Week Matrix
       const matrix = useMemo(() => {
@@ -337,7 +420,6 @@
 
       // Cumulative trajectory data
       const cumulativeData = useMemo(() => {
-        // baseline 2000-2020 min/max/median
         const days = 365;
         const baselineYears = Array.from({ length: 21 }, (_, i) => 2000 + i);
         const allCum = baselineYears.map(yr => {
@@ -351,7 +433,6 @@
           return cum;
         });
 
-        // selected year cum
         const sCum = new Array(days).fill(0);
         let sSum = 0;
         for (const r of yearRecords) {
@@ -387,7 +468,6 @@
         document.body.removeChild(link);
       };
 
-      // Cell color helper
       const getCellColor = (cell) => {
         if (mode === 'anomaly') {
           if (cell.avgZ >= 3.0) return 'bg-fuchsia-600 border-fuchsia-400';
@@ -410,11 +490,9 @@
         }
       };
 
-      // Month headers
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const years = Array.from(matrix.keys());
 
-      // SVG dimensions for cumulative chart
       const maxCurveVal = Math.max(...cumulativeData.map(d => Math.max(d.max, d.selected || 0)), 100);
       const chartW = 580;
       const chartH = 140;
@@ -460,6 +538,12 @@
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* Active API MAP KEY badge */}
+              <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>NASA FIRMS API: <strong>d3482...3048</strong></span>
+              </div>
+
               <button
                 onClick={() => setShowModal(true)}
                 className="px-3 py-1.5 rounded-lg bg-space-800 hover:bg-space-700 text-slate-300 hover:text-white border border-space-700 text-xs font-medium transition"
@@ -775,18 +859,57 @@
                   <div className="flex items-center space-x-2">
                     <span className="text-rose-500">📍</span>
                     <h3 className="text-sm font-bold text-white tracking-wide">
-                      Active Hotspot Spatial Layout ({selectedYear})
+                      {liveFirmsActive ? '🛰️ NASA FIRMS Live Detections (Last 24h)' : `Active Hotspots (${selectedYear})`}
                     </h3>
                   </div>
-                  <button
-                    onClick={() => setShowGibs(!showGibs)}
-                    className={`px-2.5 py-1 rounded text-xs border font-medium transition ${
-                      showGibs ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-space-800 text-slate-400 border-space-700 hover:text-white'
-                    }`}
-                  >
-                    🛰️ NASA GIBS Tile Layer
-                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    {/* Live FIRMS Toggle Button */}
+                    <button
+                      onClick={() => {
+                        if (liveFirmsActive) {
+                          setLiveFirmsActive(false);
+                          setFirmsStatusMsg('');
+                        } else {
+                          fetchLiveFirmsData();
+                        }
+                      }}
+                      disabled={isLoadingFirms}
+                      className={`px-2.5 py-1 rounded text-xs border font-medium transition flex items-center gap-1.5 ${
+                        liveFirmsActive
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow'
+                          : 'bg-space-800 text-slate-300 border-space-700 hover:text-white'
+                      }`}
+                    >
+                      {isLoadingFirms ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                          <span>Polling NASA...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className={`w-2 h-2 rounded-full ${liveFirmsActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                          <span>{liveFirmsActive ? 'Live NASA Feed (ON)' : 'Pull Live NASA FIRMS'}</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setShowGibs(!showGibs)}
+                      className={`px-2.5 py-1 rounded text-xs border font-medium transition ${
+                        showGibs ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-space-800 text-slate-400 border-space-700 hover:text-white'
+                      }`}
+                    >
+                      🛰️ NASA GIBS
+                    </button>
+                  </div>
                 </div>
+
+                {firmsStatusMsg && (
+                  <div className="text-[11px] text-emerald-400 font-mono mb-1 flex items-center gap-1.5">
+                    <span>⚡</span> {firmsStatusMsg}
+                  </div>
+                )}
 
                 <div className="relative flex-1 rounded-lg bg-space-950 border border-space-800 overflow-hidden flex items-center justify-center">
                   <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] opacity-40" />
@@ -813,7 +936,7 @@
 
                   {/* Hotspots */}
                   <div className="absolute inset-10 relative w-full h-full">
-                    {hotspots.map((h, i) => {
+                    {activeMapHotspots.map((h, i) => {
                       const [minLon, minLat, maxLon, maxLat] = selectedRegion.bbox;
                       const x = Math.max(5, Math.min(95, ((h.lon - minLon) / (maxLon - minLon)) * 100));
                       const y = Math.max(5, Math.min(95, (1 - (h.lat - minLat) / (maxLat - minLat)) * 100));
@@ -873,7 +996,6 @@
                     <path d={medPath} fill="none" stroke="#64748b" strokeWidth="1.5" strokeDasharray="4,4" />
                     {selPath && <path d={selPath} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />}
 
-                    {/* Y-axis markers */}
                     <text x={padL - 4} y={padT + 4} fill="#64748b" fontSize="9" textAnchor="end" fontFamily="monospace">
                       {(maxCurveVal / 1000).toFixed(0)}k
                     </text>
@@ -881,7 +1003,6 @@
                       {(maxCurveVal / 2000).toFixed(0)}k
                     </text>
 
-                    {/* X-axis months */}
                     {['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'].map((m, i) => (
                       <text key={m} x={getX(i * 60 + 15)} y={chartH + 25} fill="#64748b" fontSize="9" textAnchor="middle">
                         {m}
@@ -932,6 +1053,10 @@
                       <li><strong>Climatological Normalization (2000–2020):</strong> Establishing historical baseline mean (μ) and standard deviation (σ) for all 52 weeks of the year.</li>
                       <li><strong>Standardized Anomaly (Z-Score):</strong> Z = (X - μ) / σ highlights true climate extremes independent of sensor resolution.</li>
                     </ol>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-space-850 border border-space-700 font-mono text-[11px] text-emerald-400">
+                    Active NASA FIRMS API MAP KEY: d3482fbea45aa613a24989c27e983048
                   </div>
                 </div>
               </div>

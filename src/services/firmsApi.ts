@@ -2,36 +2,49 @@ import { HotspotPoint } from '../types/fire';
 
 export interface FirmsApiOptions {
   apiKey?: string;
-  source: 'MODIS_NRT' | 'VIIRS_SNPP_NRT' | 'VIIRS_NOAA20_NRT';
+  source: 'MODIS_NRT' | 'VIIRS_SNPP_NRT' | 'VIIRS_NOAA20_NRT' | 'VIIRS_NOAA21_NRT';
   bbox: [number, number, number, number]; // [W, S, E, N]
   dayRange: number; // 1 to 10
 }
 
-export class FirmsApiService {
-  private static BASE_URL = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
+export const DEFAULT_NASA_KEY = 'd3482fbea45aa613a24989c27e983048';
 
+export class FirmsApiService {
   /**
-   * Fetches real-time hotspot records from NASA FIRMS API
+   * Fetches real-time hotspot records from NASA FIRMS API via proxy or direct endpoint
    */
   public static async fetchHotspots(options: FirmsApiOptions): Promise<HotspotPoint[]> {
-    const { apiKey, source, bbox, dayRange } = options;
-    if (!apiKey) {
-      console.warn('No NASA FIRMS API Key provided. Returning empty or proxy.');
-      return [];
-    }
-
+    const { apiKey = DEFAULT_NASA_KEY, source, bbox, dayRange } = options;
     const [w, s, e, n] = bbox;
-    const url = `${this.BASE_URL}/${apiKey}/${source}/${w},${s},${e},${n}/${dayRange}`;
+    const bboxStr = `${w},${s},${e},${n}`;
+
+    // Try relative /api/firms first (works seamlessly on Vercel and local serve.py)
+    const proxyUrl = `/api/firms?source=${source}&bbox=${bboxStr}&dayRange=${dayRange}&mapKey=${apiKey}`;
+    const directUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${source}/${bboxStr}/${dayRange}`;
 
     try {
-      const response = await fetch(url);
+      let response = await fetch(proxyUrl);
       if (!response.ok) {
-        throw new Error(`FIRMS API responded with status ${response.status}`);
+        // Fallback to direct call
+        response = await fetch(directUrl);
       }
+      if (!response.ok) {
+        throw new Error(`FIRMS responded with HTTP ${response.status}`);
+      }
+
       const csvText = await response.text();
       return this.parseFirmsCsv(csvText, source.includes('VIIRS') ? 'VIIRS' : 'MODIS');
     } catch (err) {
-      console.error('Failed to fetch from NASA FIRMS:', err);
+      console.warn('Proxy fetch failed, attempting direct fetch:', err);
+      try {
+        const directResp = await fetch(directUrl);
+        if (directResp.ok) {
+          const csvText = await directResp.text();
+          return this.parseFirmsCsv(csvText, source.includes('VIIRS') ? 'VIIRS' : 'MODIS');
+        }
+      } catch (directErr) {
+        console.error('All FIRMS fetch attempts failed:', directErr);
+      }
       return [];
     }
   }
@@ -58,10 +71,14 @@ export class FirmsApiService {
       const parts = lines[i].split(',');
       if (parts.length < headers.length) continue;
 
+      const lat = parseFloat(parts[latIdx]);
+      const lon = parseFloat(parts[lonIdx]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+
       results.push({
-        id: `firms-${i}`,
-        latitude: parseFloat(parts[latIdx]),
-        longitude: parseFloat(parts[lonIdx]),
+        id: `firms-${instrument.toLowerCase()}-${i}`,
+        latitude: lat,
+        longitude: lon,
         brightness: 320,
         scan: 1,
         track: 1,
@@ -71,7 +88,7 @@ export class FirmsApiService {
         instrument,
         confidence: parts[confIdx] || 'n',
         version: 'NRT',
-        frp: parseFloat(parts[frpIdx]) || 10.0,
+        frp: parseFloat(parts[frpIdx]) || 5.0,
         daynight: 'D'
       });
     }
