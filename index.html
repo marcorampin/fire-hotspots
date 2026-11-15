@@ -1,47 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Global Fire Detections — MODIS & VIIRS</title>
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin="" />
-    <!-- MarkerCluster CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-
-    <!-- Our styles -->
-    <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-    <div id="map"></div>
-
-    <!-- Legend / info panel -->
-    <div id="info-panel">
-        <h2>Global Fire Detections</h2>
-        <p class="subtitle">MODIS + VIIRS (SNPP, NOAA-20, NOAA-21)</p>
-        <div class="legend">
-            <div class="legend-row">
-                <span class="dot high"></span> High confidence
-            </div>
-            <div class="legend-row">
-                <span class="dot nominal"></span> Nominal confidence
-            </div>
-        </div>
-        <div id="stats">Loading data…</div>
-    </div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
-    <!-- MarkerCluster JS -->
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-    <!-- Our logic -->
-    <script src="app.js"></script>
-</body>
-</html>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Firescope · Italy</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
+*{box-sizing:border-box}body{font:16px/1.5 system-ui;background:#f4f1e8;color:#203933;margin:auto;max-width:1240px;padding:24px}h1{font:clamp(2rem,6vw,4.6rem) Georgia;margin:.3em 0}h2{margin:20px 0 4px}p{max-width:83ch}select,button,input{font:inherit}#calendar{overflow:auto;background:white;padding:10px}.row{display:grid;grid-template-columns:48px repeat(53,minmax(13px,1fr));gap:2px;min-width:870px;align-items:center}.row button,.empty{height:18px;border:0;border-radius:2px}.row button{cursor:pointer}.row button:focus,.row button.chosen{outline:2px solid #122e25;z-index:1}.row small{font-size:10px}.row b{font-size:12px}.note{background:#e5ebdf;padding:10px}.unknown{color:#596366}#map{height:400px;background:#ddd}svg{width:100%;height:auto;background:white}section{margin:20px 0}#detail{background:white;padding:14px}#mapbox[hidden]{display:none}button{cursor:pointer}
+@font-face{font-family:Honk;src:url(fonts/honk.ttf)}@font-face{font-family:Space;src:url(fonts/space.ttf);font-weight:300 700}
+html{background:#000;color-scheme:dark}body{font-family:Space,sans-serif;background:black;color:white}h1{font:clamp(4rem,10vw,8rem)/1 Honk,sans-serif;margin:20px 0 30px}select,button{color:white;background:#141414;border:1px solid #666;border-radius:5px;padding:4px 8px}#calendar,#detail,#chart{background:#070707;color:white}#chart text{fill:white}a{color:white}.row button{padding:0}.row button:focus,.row button.chosen{outline:2px solid white}dialog{background:#101010;color:white;border:1px solid #666;border-radius:12px;width:min(900px,94vw);max-height:92vh;padding:18px}dialog::backdrop{background:#000b}#map{height:min(50vh,460px)}#close{float:right}.leaflet-container{font-family:Space,sans-serif}.leaflet-popup-content-wrapper,.leaflet-control-attribution{background:#171717!important;color:white!important}.leaflet-control-attribution a{color:white!important}.series{display:flex;flex-wrap:wrap;gap:18px;padding:0;list-style:none}.series li{max-width:310px}.series b{display:block}.series b:before{content:"";display:inline-block;width:2em;border-top:3px solid var(--line);margin-right:.4em;vertical-align:middle}
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:16px;align-items:start;margin-top:16px}#legend{display:grid;gap:6px;font-size:13px;padding:10px 0}#legend span{display:flex;align-items:center;gap:7px}#legend i{width:14px;height:14px;border-radius:2px}@media(max-width:600px){.calendar-layout{gap:6px}#legend{font-size:11px}}</style><h1>Firescope</h1>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px"><button id="choose">Choose area on map</button><button id="resetArea" hidden>Show all Italy</button><span id="scope" aria-live="polite">All Italy</span></div>
+<dialog id="areaDialog" aria-labelledby="areaHeading"><button id="dismiss" style="float:right">Close ×</button><h2 id="areaHeading">Choose an area</h2><p>Click the map to place the centre. Set the radius to include nearby detections.</p><div id="areaMap" style="height:min(48vh,420px)"></div>
+<label>Radius (km) <input id="radius" type="number" value="50" min="1" max="1500" step="1" style="width:6em"></label> <button id="applyArea" disabled>Show area calendar</button><p id="areaStatus" role="status"></p></dialog>
+<label>Calendar <select id="mode"><option value="H" selected>Harmonised</option><option value="M">Raw MODIS · Terra + Aqua</option><option value="V">Raw VIIRS · Suomi NPP</option></select></label>
+<div class="calendar-layout"><div id="calendar"></div><aside id="legend" aria-label="Detected cells per week"><b>Detected cells</b><span><i style="background:#f2f0de"></i>0</span><span><i style="background:#eed89d"></i>1–9</span><span><i style="background:#dfa962"></i>10–49</span><span><i style="background:#c5763e"></i>50–149</span><span><i style="background:#963d2e"></i>150+</span><span><i style="background:#bac0c1"></i>Unavailable</span></aside></div><section id="detail" aria-live="polite"></section>
+<dialog id="mapbox" aria-labelledby="weektitle"><button id="close" autofocus>Close ×</button><h2 id="weektitle">Week on the map</h2><p id="mapinfo"></p><div id="map"></div></dialog>
+<h2>Italy · weekly hotspot activity</h2><label>Comparison year <select id="chartyear"></select></label>
+<p>Each line counts the distinct 10 km cells with a detection in each ISO week. A gap means that series is unavailable.</p>
+<ul class="series"><li style="--line:#82aaff"><b>Raw MODIS</b>Terra and Aqua detections from the FIRMS archive.</li><li style="--line:#42d9bc"><b>Raw VIIRS</b>Suomi NPP detections from the FIRMS archive.</li><li style="--line:#ffab60"><b>Harmonised</b></li></ul><svg id="chart" viewBox="0 0 1000 185" role="img" aria-label="Weekly detected-cell counts by sensor"></svg>
+<p><a href="data/weeks.csv">Weekly table</a> · <a href="data/inventory.csv">Archive inventory</a> · <a href="METHODS.txt">Methods and coverage requirements</a></p>
+<script src="data/calendar.js"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="italy.js"></script></html>
