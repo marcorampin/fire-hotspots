@@ -14,7 +14,32 @@ function draw(){
  }}
  const w=selected,r=w[s+'range'],c=w[s+'coverage'];
  $('detail').innerHTML='<b>Week beginning '+w.week+' · ISO week '+w.slot+'</b><br>'+fmt(w[s])+' '+(s==='A'?'estimated VIIRS-equivalent cells':'distinct cells with qualifying detections')+(s==='H'?' · '+fmt(w.rows)+' merged rows · '+fmt(w.members)+' summed n_merged'+(w.partial?' · partial boundary week':''):'')+'. Archive MODIS '+fmt(w.M)+' · raw VIIRS '+fmt(w.V)+'.<br>Earlier seasonal range (10th–90th percentile): '+(r?fmt(r[0])+'–'+fmt(r[2])+', median '+fmt(r[1]):'insufficient prior years')+'.';
- $('chartyear').value=w.year;chart();
+ $('chartyear').value=w.year;chart();$('annualWeek').value=w.slot;annualChart();
+}
+function annualChart(){
+ const slot=Number($('annualWeek').value);
+ const byYear=new Map(weeks.filter(w=>w.slot===slot).map(w=>[w.year,w]));
+ const series=[['M','Raw MODIS','#82aaff'],['V','Raw VIIRS','#42d9bc'],['H','Harmonised','#ffab60']];
+ const maximum=Math.max(1,...Array.from(byYear.values(),w=>Math.max(w.M??0,w.V??0,w.H??0)));
+ const x=i=>48+i*922/Math.max(1,years.length-1),y=v=>158-136*v/maximum;
+ let svg='';
+ for(const v of new Set([0,Math.round(maximum/2),maximum])){
+   svg+='<path d="M48 '+y(v)+' H970" stroke="#444"/><text x="41" y="'+(y(v)+4)+'" text-anchor="end" font-size="12">'+v+'</text>';
+ }
+ years.forEach((year,i)=>{svg+='<text transform="translate('+x(i)+' 171) rotate(-48)" text-anchor="end" font-size="11">'+year+'</text>';});
+ for(const [key,name,color] of series){
+   let path='',dots='',connected=false;
+   years.forEach((year,i)=>{
+     const v=byYear.get(year)?.[key];
+     if(v==null){connected=false;return;}
+     path+=(connected?' L':' M')+x(i)+' '+y(v);connected=true;
+     dots+='<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3" fill="'+color+'"><title>'+name+' · '+year+' · week '+slot+' · '+v+' cells</title></circle>';
+   });
+   svg+='<path d="'+path+'" stroke="'+color+'" stroke-width="2" fill="none"/>'+dots;
+ }
+ $('annualChart').innerHTML=svg;
+ $('annualChart').setAttribute('aria-label','Detected cells in ISO week '+slot+' by year and dataset');
+ $('annualScope').textContent=' · '+$('scope').textContent;
 }
 function chart(){const rows=weeks.filter(w=>w.year===$('chartyear').value*1),peak=Math.max(1,...rows.flatMap(w=>[w.M,w.V,w.H]));let svg='<text x="4" y="16">'+Math.ceil(peak)+'</text><text x="8" y="158">0</text><text x="45" y="180">W1</text><text x="935" y="180">W53</text>';
  for(const [key,color] of [['M','#82aaff'],['V','#42d9bc'],['H','#ffab60']]){let path='',pen=false;for(const w of rows){if(w[key]==null){pen=false;continue}path+=(pen?' L':' M')+(45+(w.slot-1)*18)+' '+(155-140*w[key]/peak);pen=true}svg+='<path d="'+path+'" stroke="'+color+'" fill="none" stroke-width="2"/>'}$('chart').innerHTML=svg}
@@ -28,6 +53,7 @@ async function openMap(){const id=++request,yr=selected.week.slice(0,4);if(!$('m
  pointsLayer.clearLayers();currentPoints=[];
  if(!window.ITALY_POINTS[yr]){try{await new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='data/'+yr+'.js';sc.onload=ok;sc.onerror=no;document.body.append(sc)})}catch{if(id===request)$('mapinfo').textContent='Observation file unavailable.';return}}
  if(id!==request)return;currentPoints=window.ITALY_POINTS[yr][selected.week]||[];$('mapinfo').textContent=($('scope').textContent)+' · '+selected.week+' · '+($('mode').value==='H'?'Harmonised':$('mode').value==='V'?'Suomi NPP VIIRS':'original MODIS detections')+' · one marker per detection.';markers();}
+for(let i=1;i<=53;i++)$('annualWeek').add(new Option(i,i));$('annualWeek').onchange=annualChart;
 for(const y of years)$('chartyear').add(new Option(y,y));$('chartyear').onchange=chart;$('mode').onchange=draw;
 $('close').onclick=()=>$('mapbox').close();
 $('mapbox').onclose=()=>{request++;document.querySelector('.chosen')?.focus({preventScroll:true});};

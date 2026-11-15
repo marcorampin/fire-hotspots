@@ -9,7 +9,11 @@ html{background:#000;color-scheme:dark}body{font-family:Space,sans-serif;backgro
 <label>Calendar <select id="mode"><option value="H" selected>Harmonised</option><option value="M">Raw MODIS · Terra + Aqua</option><option value="V">Raw VIIRS · Suomi NPP</option></select></label>
 <div class="calendar-layout"><div id="calendar"></div><aside id="legend" aria-label="Detected cells per week"><b>Detected cells</b><span><i style="background:#f2f0de"></i>0</span><span><i style="background:#eed89d"></i>1–9</span><span><i style="background:#dfa962"></i>10–49</span><span><i style="background:#c5763e"></i>50–149</span><span><i style="background:#963d2e"></i>150+</span><span><i style="background:#bac0c1"></i>Unavailable</span></aside></div><section id="detail" aria-live="polite"></section>
 <dialog id="mapbox" aria-labelledby="weektitle"><button id="close" autofocus>Close ×</button><h2 id="weektitle">Week on the map</h2><p id="mapinfo"></p><div id="map"></div></dialog>
-<h2>Italy · weekly hotspot activity</h2><label>Comparison year <select id="chartyear"></select></label>
+<section aria-labelledby="annual-heading"><h2 id="annual-heading">Same week across years</h2>
+<label>ISO week <select id="annualWeek"></select></label> <span id="annualScope"></span>
+<p>Distinct 10 km cells with a hotspot. Hover over a point for its count.</p>
+<ul class="series"><li style="--line:#82aaff"><b>Raw MODIS</b></li><li style="--line:#42d9bc"><b>Raw VIIRS</b></li><li style="--line:#ffab60"><b>Harmonised</b></li></ul>
+<div style="overflow-x:auto"><svg id="annualChart" style="display:block;width:100%;min-width:800px;background:#070707;color:white;fill:currentColor" viewBox="0 0 1000 210" role="img"></svg></div></section><h2>Italy · weekly hotspot activity</h2><label>Comparison year <select id="chartyear"></select></label>
 <p>Each line counts the distinct 10 km cells with a detection in each ISO week. A gap means that series is unavailable.</p>
 <ul class="series"><li style="--line:#82aaff"><b>Raw MODIS</b>Terra and Aqua detections from the FIRMS archive.</li><li style="--line:#42d9bc"><b>Raw VIIRS</b>Suomi NPP detections from the FIRMS archive.</li><li style="--line:#ffab60"><b>Harmonised</b></li></ul><svg id="chart" viewBox="0 0 1000 185" role="img" aria-label="Weekly detected-cell counts by sensor"></svg>
 <p><a href="data/weeks.csv">Weekly table</a> · <a href="data/inventory.csv">Archive inventory</a> · <a href="METHODS.txt">Methods and coverage requirements</a></p>
